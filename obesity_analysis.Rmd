@@ -1,0 +1,907 @@
+---
+title: "ilant_health_take-home_project"
+author: "Jim Tinley"
+date: "2023-08-26"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Importing libraries
+```{r, message=FALSE}
+library(data.table)
+library(tidyr) 
+library(ggplot2)
+library(readr)
+library(knitr)
+library(corrplot)
+library(psych)
+library(cobalt)
+library(caret)
+library(pscl)
+library(rms)
+library(fastDummies)
+library(mltools)
+library(stringr)
+library(kableExtra)
+library(car)
+library(tidyverse) 
+library(Matching)
+library(WeightIt)
+library(gamlr)
+library(glmnet)
+``` 
+
+```{r}
+# setting working directory
+setwd("~/Documents/ilant_project")
+```
+
+# Importing files
+
+## Beneficiary summary files - main file with patient features
+```{r}
+ben_1_08_summary_dt <- fread("DE1_0_2008_Beneficiary_Summary_File_Sample_20.csv")
+ben_1_09_summary_dt <- fread("DE1_0_2009_Beneficiary_Summary_File_Sample_20.csv")
+ben_1_10_summary_dt <- fread("DE1_0_2010_Beneficiary_Summary_File_Sample_20.csv")
+
+ben_2_08_summary_dt <- fread("DE1_0_2008_Beneficiary_Summary_File_Sample_2.csv")
+ben_2_09_summary_dt <- fread("DE1_0_2009_Beneficiary_Summary_File_Sample_2.csv")
+ben_2_10_summary_dt <- fread("DE1_0_2010_Beneficiary_Summary_File_Sample_2.csv")
+
+ben_3_08_summary_dt <- fread("DE1_0_2008_Beneficiary_Summary_File_Sample_3.csv")
+ben_3_09_summary_dt <- fread("DE1_0_2009_Beneficiary_Summary_File_Sample_3.csv")
+ben_3_10_summary_dt <- fread("DE1_0_2010_Beneficiary_Summary_File_Sample_3.csv")
+
+ben_4_08_summary_dt <- fread("DE1_0_2008_Beneficiary_Summary_File_Sample_4.csv")
+ben_4_09_summary_dt <- fread("DE1_0_2009_Beneficiary_Summary_File_Sample_4.csv")
+ben_4_10_summary_dt <- fread("DE1_0_2010_Beneficiary_Summary_File_Sample_4.csv")
+
+ben_5_08_summary_dt <- fread("DE1_0_2008_Beneficiary_Summary_File_Sample_5.csv")
+ben_5_09_summary_dt <- fread("DE1_0_2009_Beneficiary_Summary_File_Sample_5.csv")
+ben_5_10_summary_dt <- fread("DE1_0_2010_Beneficiary_Summary_File_Sample_5.csv")
+
+ben_6_08_summary_dt <- fread("DE1_0_2008_Beneficiary_Summary_File_Sample_6.csv")
+ben_6_09_summary_dt <- fread("DE1_0_2009_Beneficiary_Summary_File_Sample_6.csv")
+ben_6_10_summary_dt <- fread("DE1_0_2010_Beneficiary_Summary_File_Sample_6.csv")
+
+ben_7_08_summary_dt <- fread("DE1_0_2008_Beneficiary_Summary_File_Sample_7.csv")
+ben_7_09_summary_dt <- fread("DE1_0_2009_Beneficiary_Summary_File_Sample_7.csv")
+ben_7_10_summary_dt <- fread("DE1_0_2010_Beneficiary_Summary_File_Sample_7.csv")
+```
+
+### Creating combined beneficiary summary files - 1/year
+```{r}
+beneficiary_08_summary_files <- list(
+  ben_1_08_summary_dt, ben_2_08_summary_dt, ben_3_08_summary_dt, 
+  ben_4_08_summary_dt, ben_5_08_summary_dt, ben_6_08_summary_dt, 
+  ben_7_08_summary_dt
+)
+
+beneficiary_09_summary_files <- list(
+  ben_1_09_summary_dt, ben_2_09_summary_dt, ben_3_09_summary_dt,
+  ben_4_09_summary_dt, ben_5_09_summary_dt,ben_6_09_summary_dt, 
+  ben_7_09_summary_dt
+)
+
+beneficiary_10_summary_files <- list(
+  ben_1_10_summary_dt, ben_2_10_summary_dt, ben_3_10_summary_dt,
+  ben_4_10_summary_dt, ben_5_10_summary_dt, ben_6_10_summary_dt,
+  ben_7_10_summary_dt
+)
+
+ben_08_summary_DT <- rbindlist(
+  beneficiary_08_summary_files,
+  use.names = TRUE,
+  fill = TRUE,
+  idcol = "file"
+)
+
+ben_09_summary_DT <- rbindlist(
+  beneficiary_09_summary_files,
+  use.names = TRUE,
+  fill = TRUE,
+  idcol = "file"
+)
+
+ben_10_summary_DT <- rbindlist(
+  beneficiary_10_summary_files,
+  use.names = TRUE,
+  fill = TRUE,
+  idcol = "file"
+)
+
+# Removing intermediate files
+rm(ben_1_08_summary_dt, ben_1_09_summary_dt, ben_1_10_summary_dt,
+  ben_2_08_summary_dt, ben_2_09_summary_dt, ben_2_10_summary_dt,
+  ben_3_08_summary_dt, ben_3_09_summary_dt, ben_3_10_summary_dt,
+  ben_4_08_summary_dt, ben_4_09_summary_dt, ben_4_10_summary_dt,
+  ben_5_08_summary_dt, ben_5_09_summary_dt, ben_5_10_summary_dt,
+  ben_6_08_summary_dt, ben_6_09_summary_dt, ben_6_10_summary_dt,
+  ben_7_08_summary_dt, ben_7_09_summary_dt, ben_7_10_summary_dt, beneficiary_08_summary_files, beneficiary_09_summary_files, beneficiary_10_summary_files)
+```
+
+
+## Prescription Drug Events - did not use in analysis
+```{r}
+# Not using this drug data in analysis
+# drug_1_dt <- fread("DE1_0_2008_to_2010_Prescription_Drug_Events_Sample_20.csv")
+# drug_2_dt <- fread("DE1_0_2008_to_2010_Prescription_Drug_Events_Sample_2.csv")
+# drug_3_dt <- fread("DE1_0_2008_to_2010_Prescription_Drug_Events_Sample_3.csv")
+# drug_4_dt <- fread("DE1_0_2008_to_2010_Prescription_Drug_Events_Sample_4.csv")
+# drug_5_dt <- fread("DE1_0_2008_to_2010_Prescription_Drug_Events_Sample_5.csv")
+# drug_6_dt <- fread("DE1_0_2008_to_2010_Prescription_Drug_Events_Sample_6.csv")
+# drug_7_dt <- fread("DE1_0_2008_to_2010_Prescription_Drug_Events_Sample_7.csv")
+```
+
+```{r}
+# drug_files <- list(
+#   drug_1_dt, drug_2_dt, drug_3_dt, 
+#   drug_4_dt, drug_5_dt, drug_6_dt, 
+#   drug_7_dt)
+# 
+# drug_DT <- rbindlist(
+#   drug_files,  
+#   use.names = TRUE, 
+#   fill = TRUE,
+#   idcol ="file")
+# 
+# rm(drug_1_dt, drug_2_dt, drug_3_dt, 
+#   drug_4_dt, drug_5_dt, drug_6_dt, 
+#   drug_7_dt, drug_files)
+```
+
+## Carrier claims files
+```{r}
+# Importing
+carrier_claims_1a_dt <-fread("DE1_0_2008_to_2010_Carrier_Claims_Sample_20A.csv")
+#carrier_claims_1b_dt <-fread("DE1_0_2008_to_2010_Carrier_Claims_Sample_20B.csv")
+
+carrier_claims_2a_dt <-fread("DE1_0_2008_to_2010_Carrier_Claims_Sample_2A.csv")
+#carrier_claims_2b_dt <-fread("DE1_0_2008_to_2010_Carrier_Claims_Sample_2B.csv")
+
+carrier_claims_3a_dt <-fread("DE1_0_2008_to_2010_Carrier_Claims_Sample_3A.csv")
+#carrier_claims_3b_dt <-fread("DE1_0_2008_to_2010_Carrier_Claims_Sample_3B.csv")
+
+carrier_claims_4a_dt <-fread("DE1_0_2008_to_2010_Carrier_Claims_Sample_4A.csv")
+#carrier_claims_4b_dt <-fread("DE1_0_2008_to_2010_Carrier_Claims_Sample_4B.csv")
+
+carrier_claims_5a_dt <-fread("DE1_0_2008_to_2010_Carrier_Claims_Sample_5A.csv")
+#carrier_claims_5b_dt <-fread("DE1_0_2008_to_2010_Carrier_Claims_Sample_5B.csv")
+
+carrier_claims_6a_dt <-fread("DE1_0_2008_to_2010_Carrier_Claims_Sample_6A.csv")
+#carrier_claims_6b_dt <-fread("DE1_0_2008_to_2010_Carrier_Claims_Sample_6B.csv")
+
+carrier_claims_7a_dt <-fread("DE1_0_2008_to_2010_Carrier_Claims_Sample_7A.csv")
+#carrier_claims_7b_dt <-fread("DE1_0_2008_to_2010_Carrier_Claims_Sample_7B.csv")
+```
+
+### Custom function: filter claims files on BMI and indicate obesity & ER_visits
+```{r}
+BMI_ER_filter_function <- function(input_dt) {
+  # Create has BMI column
+  icd9_columns <- grep("^ICD9_DGNS_CD_", names(input_dt), value = TRUE)
+  input_dt[, has_BMI := 0]
+  for (col in icd9_columns) {
+    input_dt[, has_BMI := has_BMI | get(col) %like% "^V85"]
+  }
+  
+  # Create obese column based on specific ICD-9 codes
+  input_dt[, obese := 0]
+  for (col in icd9_columns) {
+    input_dt[, obese := obese | get(col) %like% "^V853" | get(col) %like% "^V854" | get(col) %like% "^278"]
+  }
+  input_dt[, obese := as.integer(obese)]
+  
+  # Filter for cases with has BMI
+  input_dt <- input_dt[has_BMI == 1]
+  
+  # Create ER_visit column
+  hcpcs_columns <- grep("^HCPCS_CD_", names(input_dt), value = TRUE)
+  input_dt[, ER_visit := 0]
+  for (col in hcpcs_columns) {
+    input_dt[, ER_visit := ER_visit | get(col) %like% "^9928"]
+  }
+
+  
+  return(input_dt)
+}
+
+```
+
+
+### Using Custom function to pre-filter carrier claims files
+```{r}
+carrier_tables <- c(
+  "carrier_claims_1a_dt",
+  "carrier_claims_2a_dt", 
+  "carrier_claims_3a_dt", 
+  "carrier_claims_4a_dt",
+  "carrier_claims_5a_dt",
+  "carrier_claims_6a_dt", 
+  "carrier_claims_7a_dt"
+)
+
+for (table_name in carrier_tables) {
+  assign(table_name, BMI_ER_filter_function(get(table_name)))
+}
+```
+
+### Combining filtered carrier claims files
+```{r}
+# Creating a combined carrier claims file
+carrier_claims_files <- list(
+  carrier_claims_1a_dt,
+  carrier_claims_2a_dt,
+  carrier_claims_3a_dt,
+  carrier_claims_4a_dt,
+  carrier_claims_5a_dt,
+  carrier_claims_6a_dt,
+  carrier_claims_7a_dt
+)
+
+carrier_claims_DT <- rbindlist(
+  carrier_claims_files,
+  use.names = TRUE, 
+  fill = TRUE,
+  idcol ="file")
+
+rm(carrier_claims_1a_dt, carrier_claims_1b_dt,
+  carrier_claims_2a_dt, carrier_claims_2b_dt,
+  carrier_claims_3a_dt, carrier_claims_3b_dt,
+  carrier_claims_4a_dt, carrier_claims_4b_dt,
+  carrier_claims_5a_dt, carrier_claims_5b_dt,
+  carrier_claims_6a_dt, carrier_claims_6b_dt,
+  carrier_claims_7a_dt, carrier_claims_7b_dt, carrier_claims_files
+)
+```
+
+```{r}
+# Checking for unique patients within data
+length(unique(carrier_claims_DT$DESYNPUF_ID))
+```
+
+### Splitting carrier claims into repsective years (needed for later joins)
+```{r}
+# splitting carrier claims into three year periods to ensure accuracy of joins with ben_summary
+carrier_08_claims_DT <- carrier_claims_DT[CLM_FROM_DT %like% "^2008"]
+carrier_09_claims_DT <- carrier_claims_DT[CLM_FROM_DT %like% "^2009"]
+carrier_10_claims_DT <- carrier_claims_DT[CLM_FROM_DT %like% "^2010"]
+```
+
+
+## Outpatient claims files
+```{r}
+# Importing
+outpatient_1_claims_dt <- fread("DE1_0_2008_to_2010_Outpatient_Claims_Sample_20.csv")
+outpatient_2_claims_dt <- fread("DE1_0_2008_to_2010_Outpatient_Claims_Sample_2.csv")
+outpatient_3_claims_dt <- fread("DE1_0_2008_to_2010_Outpatient_Claims_Sample_3.csv")
+outpatient_4_claims_dt <- fread("DE1_0_2008_to_2010_Outpatient_Claims_Sample_4.csv")
+outpatient_5_claims_dt <- fread("DE1_0_2008_to_2010_Outpatient_Claims_Sample_5.csv")
+outpatient_6_claims_dt <- fread("DE1_0_2008_to_2010_Outpatient_Claims_Sample_6.csv")
+outpatient_7_claims_dt <- fread("DE1_0_2008_to_2010_Outpatient_Claims_Sample_7.csv")
+```
+
+### Using Custom function to pre-filter outpatient claims files
+```{r}
+outpatient_tables <- c(
+  "outpatient_1_claims_dt",
+  "outpatient_2_claims_dt", 
+  "outpatient_3_claims_dt",
+  "outpatient_4_claims_dt",
+  "outpatient_5_claims_dt",
+  "outpatient_6_claims_dt", 
+  "outpatient_7_claims_dt"
+)
+
+for (table_name in outpatient_tables) {
+  assign(table_name, BMI_ER_filter_function(get(table_name)))
+}
+
+```
+
+### Combining filtered outpatient claims files
+```{r}
+outpatient_claims_files <- list(
+  outpatient_1_claims_dt, outpatient_2_claims_dt,
+  outpatient_3_claims_dt, outpatient_4_claims_dt,
+  outpatient_5_claims_dt, outpatient_6_claims_dt,
+  outpatient_7_claims_dt
+)
+
+outpatient_claims_DT <- rbindlist(
+  outpatient_claims_files,
+  use.names = TRUE, 
+  fill = TRUE,
+  idcol ="file")
+
+rm(outpatient_1_claims_dt, outpatient_2_claims_dt,
+  outpatient_3_claims_dt, outpatient_4_claims_dt,
+  outpatient_5_claims_dt, outpatient_6_claims_dt,
+  outpatient_7_claims_dt, outpatient_claims_files
+)
+```
+
+```{r}
+length(unique(outpatient_claims_DT$DESYNPUF_ID))
+```
+
+### Splitting outpatient claims into repsective years (needed for later joins)
+```{r}
+# splitting carrier claims into three year periods to ensure accuracy of joins with ben_summary
+outpatient_08_claims_DT <- outpatient_claims_DT[CLM_FROM_DT %like% "^2008"]
+outpatient_09_claims_DT <- outpatient_claims_DT[CLM_FROM_DT %like% "^2009"]
+outpatient_10_claims_DT <- outpatient_claims_DT[CLM_FROM_DT %like% "^2010"]
+```
+
+
+## Inpatient Claims (excluded from analysis) - missing data all revenue center data (HCPCS) needed for ER coding
+```{r}
+
+# inpatient_1_claims_dt <-fread("DE1_0_2008_to_2010_Inpatient_Claims_Sample_20.csv")
+# inpatient_2_claims_dt <-fread("DE1_0_2008_to_2010_Inpatient_Claims_Sample_2.csv")
+# inpatient_3_claims_dt <-fread("DE1_0_2008_to_2010_Inpatient_Claims_Sample_3.csv")
+# inpatient_4_claims_dt <-fread("DE1_0_2008_to_2010_Inpatient_Claims_Sample_4.csv")
+# inpatient_5_claims_dt <-fread("DE1_0_2008_to_2010_Inpatient_Claims_Sample_5.csv")
+# inpatient_6_claims_dt <-fread("DE1_0_2008_to_2010_Inpatient_Claims_Sample_6.csv")
+# inpatient_7_claims_dt <-fread("DE1_0_2008_to_2010_Inpatient_Claims_Sample_7.csv")
+```
+
+```{r}
+# SKIP HCPCS data is missing for all files--cannot determine ER visit
+# inpatient_1_claims_dt <- BMI_ER_filter_function(inpatient_1_claims_dt)
+# inpatient_2_claims_dt <- BMI_ER_filter_function(inpatient_2_claims_dt)
+# inpatient_3_claims_dt <- BMI_ER_filter_function(inpatient_3_claims_dt)
+# inpatient_4_claims_dt <- BMI_ER_filter_function(inpatient_4_claims_dt)
+# inpatient_5_claims_dt <- BMI_ER_filter_function(inpatient_5_claims_dt)
+# inpatient_6_claims_dt <- BMI_ER_filter_function(inpatient_6_claims_dt)
+# inpatient_7_claims_dt <- BMI_ER_filter_function(inpatient_7_claims_dt)
+```
+
+# Joining data
+
+
+## Joining 2008 outpatient and carrier claims data
+```{r}
+carrier_08_patient_IDs <- carrier_08_claims_DT[,c("DESYNPUF_ID","obese", "ER_visit")]
+outpatient_08_patient_IDs <- outpatient_08_claims_DT[,c("DESYNPUF_ID", "obese", "ER_visit")]
+
+patients_08_DT <- rbindlist(list(
+  carrier_08_patient_IDs,
+  outpatient_08_patient_IDs),
+  use.names = TRUE,
+  fill = TRUE,
+  idcol = "file"
+)
+
+patients_08_DT <- patients_08_DT[!duplicated(DESYNPUF_ID)]
+```
+
+## Joining 2009 outpatient and carrier claims data
+```{r}
+carrier_09_patient_IDs <- carrier_09_claims_DT[,c("DESYNPUF_ID","obese", "ER_visit")]
+outpatient_09_patient_IDs <- outpatient_09_claims_DT[,c("DESYNPUF_ID","obese", "ER_visit")]
+
+patients_09_DT <- rbindlist(list(
+  carrier_09_patient_IDs,
+  outpatient_09_patient_IDs),
+  use.names = TRUE,
+  fill = TRUE,
+  idcol = "file"
+)
+
+patients_09_DT <- patients_09_DT[!duplicated(DESYNPUF_ID)]
+```
+
+## Joining 2010 outpatient and carrier claims data
+```{r}
+carrier_10_patient_IDs <- carrier_10_claims_DT[,c("DESYNPUF_ID","obese", "ER_visit")]
+outpatient_10_patient_IDs <- outpatient_10_claims_DT[,c("DESYNPUF_ID","obese", "ER_visit")]
+
+patients_10_DT <- rbindlist(list(
+  carrier_10_patient_IDs,
+  outpatient_10_patient_IDs),
+  use.names = TRUE,
+  fill = TRUE,
+  idcol = "file"
+)
+
+patients_10_DT <- patients_10_DT[!duplicated(DESYNPUF_ID)]
+```
+
+
+## Joining claims files based on unique patient ID with beneficiary summary
+```{r}
+ben_claims_08_merge <- merge(ben_08_summary_DT, patients_08_DT, 
+                           by = "DESYNPUF_ID", all.y = TRUE)
+```
+
+```{r}
+ben_claims_09_merge <- merge(ben_09_summary_DT, patients_09_DT, 
+                           by = "DESYNPUF_ID", all.y = TRUE)
+```
+
+```{r}
+ben_claims_10_merge <- merge(ben_10_summary_DT, patients_10_DT, 
+                           by = "DESYNPUF_ID", all.y = TRUE)
+```
+
+```{r}
+all_patients_summary_DT <- rbindlist(list(
+  ben_claims_08_merge,
+  ben_claims_09_merge,
+  ben_claims_10_merge),
+  use.names = TRUE,
+  fill = TRUE,
+  idcol = "file"
+)
+
+all_patients_summary_DT <- all_patients_summary_DT[, -c("file.x", "file.y")]
+
+# YOY patient overlap
+length(unique(all_patients_summary_DT$DESYNPUF_ID))
+
+# removing YOY patient overlap
+all_patients_summary_DT <- all_patients_summary_DT[!duplicated(DESYNPUF_ID)]
+```
+
+## Cleaning data for analysis
+```{r}
+# Adding age variable
+
+reference_date <- as.Date("2011-01-01")
+all_patients_summary_DT[, BENE_BIRTH_DT := as.Date(as.character(BENE_BIRTH_DT), format = "%Y%m%d")]
+all_patients_summary_DT[, age := as.integer((reference_date - BENE_BIRTH_DT) / 365.25)]
+all_patients_summary_DT <- all_patients_summary_DT[, -c("BENE_BIRTH_DT")]
+```
+
+```{r}
+# Adding deceased binary
+
+all_patients_summary_DT[, deceased := as.numeric(ifelse(BENE_DEATH_DT>0, 1,0))]
+all_patients_summary_DT[is.na(deceased), deceased := 0]
+all_patients_summary_DT <- all_patients_summary_DT[, -c("BENE_DEATH_DT")]
+```
+
+```{r}
+# Creating 0/1 sex binary
+all_patients_summary_DT[, female := as.numeric(ifelse(BENE_SEX_IDENT_CD==2, 1,0))]
+
+# Dropping original categorical variable BENE_SEX
+all_patients_summary_DT <- all_patients_summary_DT[, -c("BENE_SEX_IDENT_CD")]
+```
+
+```{r}
+# One-hot encoding race; first creating categorical variable
+all_patients_summary_DT[, race := 
+  ifelse(BENE_RACE_CD == 1, "white",
+         ifelse(BENE_RACE_CD == 2, "black",
+                ifelse(BENE_RACE_CD == 3, "other",
+                       ifelse(BENE_RACE_CD == 5, "hispanic", "unknown")
+                )
+         )
+  )
+]
+
+# One-hot
+all_patients_summary_DT$race <- as.factor(all_patients_summary_DT$race)
+all_patients_summary_DT <- all_patients_summary_DT[,c("black","hispanic","other","white") := one_hot(as.data.table(all_patients_summary_DT$race))]
+
+# Dropping original categorical variable and baseline (white) to avoid multicolinearity 
+all_patients_summary_DT <- all_patients_summary_DT[, -c("white","race","BENE_RACE_CD")]
+```
+
+```{r}
+# reformatting all chronic conditions 0/1 binaries
+all_patients_summary_DT[, alzheimer_dementia := as.numeric(
+  ifelse(SP_ALZHDMTA==1, 1,0))]
+
+all_patients_summary_DT[, chronic_heart_failure := as.numeric(
+  ifelse(SP_CHF==1, 1,0))]
+
+all_patients_summary_DT[, kidney_disease := as.numeric(
+  ifelse(SP_CHRNKIDN==1, 1,0))]
+
+all_patients_summary_DT[, cancer := as.numeric(
+  ifelse(SP_CNCR==1, 1,0))]
+
+all_patients_summary_DT[, copd := as.numeric(
+  ifelse(SP_COPD==1, 1,0))]
+
+all_patients_summary_DT[, depression := as.numeric(
+  ifelse(SP_DEPRESSN==1, 1,0))]
+
+all_patients_summary_DT[, diabetes := as.numeric(
+  ifelse(SP_DIABETES==1, 1,0))]
+
+all_patients_summary_DT[, ischemic_heart_disease := as.numeric(
+  ifelse(SP_ISCHMCHT==1, 1,0))]
+
+all_patients_summary_DT[, osteoporosis := as.numeric(
+  ifelse(SP_OSTEOPRS==1, 1,0))]
+
+all_patients_summary_DT[, rheumatoid_and_osteoarthritis := as.numeric(
+  ifelse(SP_RA_OA==1, 1,0))]
+
+all_patients_summary_DT[, stroke_transient_ischemic_attack := as.numeric(
+  ifelse(SP_STRKETIA==1, 1,0))]
+
+# Creating binary for end stage renal disease
+all_patients_summary_DT[, end_stage_renal_disease := as.numeric(
+  ifelse(BENE_ESRD_IND=="Y", 1,0))]
+
+# Creating health insurance binaries for PartA-D
+all_patients_summary_DT[, part_A_coverage := as.numeric(
+  ifelse(BENE_HI_CVRAGE_TOT_MONS>0, 1,0))]
+
+all_patients_summary_DT[, part_B_coverage := as.numeric(
+  ifelse(BENE_SMI_CVRAGE_TOT_MONS>0, 1,0))]
+
+all_patients_summary_DT[, HMO_coverage := as.numeric(
+  ifelse(BENE_HMO_CVRAGE_TOT_MONS>0, 1,0))]
+
+all_patients_summary_DT[, part_D_coverage := as.numeric(
+  ifelse(PLAN_CVRG_MOS_NUM>0, 1,0))]
+
+
+# Dropping all redundant columns
+all_patients_summary_DT <- all_patients_summary_DT[, -c(
+"SP_ALZHDMTA","SP_CHF", "SP_CHRNKIDN",
+"SP_CHF", "SP_CNCR", "SP_COPD",
+"SP_DEPRESSN", "SP_DIABETES", 
+"SP_ISCHMCHT", "SP_OSTEOPRS", 
+"SP_RA_OA", "SP_STRKETIA", "BENE_ESRD_IND",
+"BENE_HI_CVRAGE_TOT_MONS",
+"BENE_SMI_CVRAGE_TOT_MONS",
+"BENE_HMO_CVRAGE_TOT_MONS",
+"PLAN_CVRG_MOS_NUM")]
+```
+
+
+
+## Using given SSA county codes to get supplemental data on Rurality (proxy for hospital access)
+```{r}
+# concatenate state/county ssa codes
+all_patients_summary_DT[, ssa_state_co :=  paste0(SP_STATE_CODE, BENE_COUNTY_CD)]
+```
+
+```{r}
+# removing those with unknown county codes or states
+all_patients_summary_DT <- all_patients_summary_DT[BENE_COUNTY_CD>0 & BENE_COUNTY_CD<999 ]
+all_patients_summary_DT <- all_patients_summary_DT[SP_STATE_CODE<54]
+```
+
+```{r}
+# adding third digit to county code to match crosswalk to fips
+all_patients_summary_DT[, BENE_COUNTY_CD := sprintf("%03d", BENE_COUNTY_CD)]
+```
+
+```{r}
+# using CMS crosswalk to get fips codes
+ssa_fips_crosswalk_dt <-fread("ssa_fips_CW.csv")
+
+ssa_fips_crosswalk_dt <- ssa_fips_crosswalk_dt[, c("ssacounty", "fipscounty", "fipsstate")]
+ssa_fips_crosswalk_dt$ssacounty <- as.character(ssa_fips_crosswalk_dt$ssacounty)
+```
+
+```{r}
+# merging fips codes on to main patient file
+setkey(all_patients_summary_DT, ssa_state_co)
+setkey(ssa_fips_crosswalk_dt, ssacounty)
+
+all_patients_summary_DT <- merge(all_patients_summary_DT, ssa_fips_crosswalk_dt, by.x = "ssa_state_co", by.y = "ssacounty", all.x = TRUE)
+```
+
+```{r}
+# removing those without fips data
+all_patients_summary_DT <- all_patients_summary_DT[!is.na(fipscounty)]
+```
+
+```{r}
+# importing fips rucc crosswalk
+fips_rucc_crosswalk_dt <-fread("ruralurbancodes2013.csv")
+```
+
+```{r}
+# merging fips codes on to main patient file
+setkey(all_patients_summary_DT, fipscounty)
+setkey(fips_rucc_crosswalk_dt, FIPS)
+
+all_patients_summary_DT <- merge(all_patients_summary_DT, fips_rucc_crosswalk_dt, by.x = "fipscounty", by.y = "FIPS", all.x = TRUE)
+
+# resetting key back to unique patient id
+setkey(all_patients_summary_DT, DESYNPUF_ID)
+```
+
+```{r}
+# Reducing down to final columns for analysis
+FINAL_ANALYSIS_DT <- all_patients_summary_DT[, -c(
+  "fipscounty", "ssa_state_co", "file", "SP_STATE_CODE", "BENE_COUNTY_CD",  "MEDREIMB_IP", "MEDREIMB_OP", "MEDREIMB_OP", "MEDREIMB_CAR", "BENRES_CAR", "BENRES_IP", "BENRES_OP", "PPPYMT_IP", "PPPYMT_OP", "PPPYMT_CAR", "fipsstate", "State", "Population_2010", "County_Name", "RUCC_2013", "deceased")]
+FINAL_ANALYSIS_DT$ER_visit <- as.integer(FINAL_ANALYSIS_DT$ER_visit)
+```
+
+```{r}
+# One-hot encoding Metro description baseline will be most populous urban area
+FINAL_ANALYSIS_DT$Description <- as.factor(FINAL_ANALYSIS_DT$Description)
+metro_dt <- one_hot(as.data.table(FINAL_ANALYSIS_DT$Description))
+```
+
+```{r}
+FINAL_ANALYSIS_DT <- FINAL_ANALYSIS_DT[,c(
+  "Metro - 1 million pop or more",
+  "Metro - 250,000 to 1 million pop",
+  "Metro - fewer than 250,000 pop",
+  "Nonmetro - rural-less than 2,500 urban pop, adjacent to a metro area",
+  "Nonmetro - rural-less than 2,500 urban pop, not adjacent to a metro area",
+  "Nonmetro - Urban pop of 2,500 to 19,999, adjacent to a metro area" ,
+  "Nonmetro - Urban pop of 2,500 to 19,999, not adjacent to a metro area",
+  "Nonmetro - Urban pop of 20,000 or more, adjacent to a metro area", 
+  "Nonmetro - Urban pop of 20,000 or more, not adjacent to a metro area") := one_hot(as.data.table(FINAL_ANALYSIS_DT$Description))]
+```
+
+```{r}
+#Dropping original categorical variable and baseline (white) to avoid multicolinearity 
+FINAL_ANALYSIS_DT <- FINAL_ANALYSIS_DT[, -c("Metro - Counties in metro areas of 1 million population or more","Description")]
+```
+
+```{r}
+FINAL_ANALYSIS_DT <- FINAL_ANALYSIS_DT[!duplicated(DESYNPUF_ID)]
+FINAL_ANALYSIS_DT <- FINAL_ANALYSIS_DT[,-c("DESYNPUF_ID")]
+```
+
+```{r}
+# removing all observations with missing data
+FINAL_ANALYSIS_DT <- na.omit(FINAL_ANALYSIS_DT)
+```
+
+
+
+# Exploratory data analysis
+
+## Baseline Treatment Balance: Obesity v. Non-Obesity
+```{r}
+ggplot(FINAL_ANALYSIS_DT, aes(x = factor(obese), fill = factor(obese))) +
+  geom_bar() +
+  labs(title = "Treatment Balance",
+       x = "Obese",
+       y = "Count") +
+  scale_fill_manual(values = c("grey", "maroon")) +
+  theme_minimal()
+```
+
+## Baseline Outcome Balance: ER-Visit vs. Non-ER procedure
+```{r}
+ggplot(FINAL_ANALYSIS_DT, aes(x = factor(ER_visit), fill = factor(ER_visit))) +
+  geom_bar() +
+  labs(title = "Outcome Class Balance",
+       x = "Obese",
+       y = "Count") +
+  scale_fill_manual(values = c("grey", "lightblue")) +
+  theme_minimal()
+
+```
+
+```{r}
+library(ggplot2)
+table_matrix <- table(FINAL_ANALYSIS_DT$obese, FINAL_ANALYSIS_DT$ER_visit)
+matrix_df <- as.data.frame(as.table(table_matrix))
+
+ggplot(matrix_df, aes(x = Var1, y = Var2, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), vjust = 1) +
+  labs(title = "Baseline Population Overview: Obesity v. ER Visits",
+       x = "Obese",
+       y = "ER Visit",
+       fill = "Frequency") +
+  scale_fill_gradient(low = "grey", high = "maroon") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12))
+
+
+```
+
+
+## Balancing Treatment Classes
+```{r}
+# Since this in a causal inference problem we won't balance the outcome variable
+# However, it is important that our treatment groups are balanced
+# To achieve this randomly downsampling majority (obese=1) group
+nonobese_dt <- FINAL_ANALYSIS_DT[obese==0]
+obese_dt <- FINAL_ANALYSIS_DT[obese==1]
+```
+
+```{r}
+set.seed(12341)
+obese_samp <- obese_dt[sample(nrow(obese_dt), nrow(nonobese_dt), replace = FALSE), ]
+```
+
+```{r}
+FINAL_ANALYSIS_DT <- rbindlist(list(obese_samp, nonobese_dt),
+                            use.names = TRUE)
+```
+
+```{r}
+# rechecking Population obesity breakdown
+sum(FINAL_ANALYSIS_DT$obese==1)
+sum(FINAL_ANALYSIS_DT$obese==0)
+```
+
+```{r}
+table_matrix <- table(FINAL_ANALYSIS_DT$obese, FINAL_ANALYSIS_DT$ER_visit)
+
+matrix_df <- as.data.frame(as.table(table_matrix))
+
+ggplot(matrix_df, aes(x = Var1, y = Var2, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), vjust = 1) +
+  labs(title = "Population Overview: Obesity v. ER Visits",
+       x = "Obese",
+       y = "ER Visit",
+       fill = "Frequency") +
+  scale_fill_gradient(low = "grey", high = "maroon") +
+  theme_minimal()  +
+  theme(axis.text.x = element_text(size = 12),  
+        axis.text.y = element_text(size = 12))  
+```
+
+
+## Fitting preliminary logistic regression
+
+```{r, results='hide'}
+fit.1 <- glm(ER_visit ~ ., data = FINAL_ANALYSIS_DT, family = "binomial")
+summary(fit.1)
+```
+
+```{r}
+summary_fit.1 <- summary(fit.1)
+variables_fit.1 <- as.data.table(rownames(summary_fit.1$coefficients))
+coefficients_fit.1 <- as.data.table(summary_fit.1$coefficients)
+coefficients_fit.1 <- coefficients_fit.1[, Sig := ifelse(`Pr(>|z|)` < 0.001, "***", 
+                                                         ifelse(`Pr(>|z|)` < 0.01, "**",
+                                                                ifelse(`Pr(>|z|)` < 0.05, "*", "")))]
+abbreviated_covariates_fit.1 <- str_trunc(variables_fit.1, 150) 
+summary_fit.1_dt <- cbind(variables_fit.1, coefficients_fit.1)
+```
+
+```{r}
+kable(summary_fit.1_dt, digits = 4) %>% 
+  kable_styling(font_size = 12, latex_options = "striped") %>% 
+    add_header_above(c("Logistic Regression" = 6))
+rm(variables_fit.1, coefficients_fit.1)
+```
+
+
+### Without estimating propensity scores being obese increases relative risk of ER visit ~25% and result is significant (p<.001)
+
+
+
+# Causal Inference
+
+## Approach 1: logisitic regression using propensity scores
+
+
+```{r}
+# Calculating standardized mean differences to decide which variables will be included in propensity scores (SMD>0.1 are considered imbalanced)
+library(tableone)
+vars <- setdiff(names(FINAL_ANALYSIS_DT), c("obese", "ER_visit"))
+
+## Construct a table with "obese" as the treatment variable
+tabUnmatched <- CreateTableOne(vars = vars, data = FINAL_ANALYSIS_DT, test = FALSE, 
+                               strata = "obese")
+
+## Show table with SMD
+print(tabUnmatched, smd = TRUE)
+
+```
+
+
+```{r}
+Tr <- cbind(FINAL_ANALYSIS_DT$obese)
+Y <- cbind(FINAL_ANALYSIS_DT$ER_visit)
+X <- cbind(FINAL_ANALYSIS_DT[, -c("ER_visit", 
+                                  "obese"
+                               )])
+X <- as.matrix(X)
+X2 <- cbind(FINAL_ANALYSIS_DT[, -c("obese", 
+                               "ER_visit"
+                               )])
+X2 <- as.matrix(X2)
+```
+
+```{r, results='hide'}
+# running first regression covariates on treatment
+glm.treat <- glm(Tr ~ X, 
+                 family = "binomial",
+                 data = FINAL_ANALYSIS_DT)
+summary(glm.treat)
+```
+
+
+
+
+```{r}
+# Overall covariate values appear to be balanced among treatment groups (SMD<0.05)
+# However, given the relatively high SMDs of kidney disease, alzheimer_dementia, 
+# stroke_transient_ischemic_attack, and part_D_coverage, that they are significantly 
+# correlated with the treatment (obesity), and a theoretical understanding that 
+# they could be potential confounds, I will use these variables in the propensity score calculations
+```
+
+```{r, results='hide'}
+# Estimating propensity scores
+glm.treat <- glm(Tr ~ alzheimer_dementia + kidney_disease + stroke_transient_ischemic_attack + part_D_coverage - ER_visit,
+                 family = "binomial",
+                 data = FINAL_ANALYSIS_DT)
+ps <- predict(glm.treat, type = "response")
+
+# Calculate the inverse probability weights
+inverse_weights <- ifelse(Tr == 1, 1 / ps, 1 / (1 - ps))
+
+# Fit the outcome model using all variables, including the ones used for propensity score
+fit.ps <- glm(Y ~ .- ER_visit , 
+              family = "binomial", 
+              weights = inverse_weights,
+              data = FINAL_ANALYSIS_DT)
+summary(fit.ps)
+
+```
+
+### Note data was already relatively balanced before estimating propensity score weights (SMD<0.05), so propensity scores had a negligible effect
+
+```{r}
+summary_fit.ps <- summary(fit.ps)
+variables_fit.ps <- as.data.table(rownames(summary_fit.ps$coefficients))
+coefficients_fit.ps <- as.data.table(summary_fit.ps$coefficients)
+coefficients_fit.ps <- coefficients_fit.ps[, Sig := ifelse(`Pr(>|z|)` < 0.001, "***", 
+                                                         ifelse(`Pr(>|z|)` < 0.01, "**",
+                                                                ifelse(`Pr(>|z|)` < 0.05, "*", "")))]
+abbreviated_covariates_fit.ps <- str_trunc(variables_fit.ps, 150) 
+summary_fit.ps_dt <- cbind(variables_fit.ps, coefficients_fit.ps)
+```
+
+```{r}
+kable(summary_fit.ps_dt, digits = 4) %>% 
+  kable_styling(font_size = 12, latex_options = "striped") %>% 
+    add_header_above(c("Logistic Regression" = 6))
+rm(variables_fit.ps, coefficients_fit.ps)
+```
+
+
+
+
+## Approach 2: Causal LASSO 
+
+```{r}
+cv.treat <- cv.gamlr(X2,Tr, family = "binomial")
+dhat <- predict(cv.treat$gamlr, X2, type = "response")
+dhat <- drop(dhat)
+```
+
+```{r}
+causal <- gamlr(cbind(Tr,dhat,X2),Y,
+ family="binomial",free=2)
+plot(causal)
+```
+
+```{r,  results='hide'}
+coef(causal)
+```
+
+
+```{r}
+causal_mat <- coef(causal)
+causal_df <- as.data.frame(as.matrix(causal_mat))
+kable(causal_df, digits = 4) %>% 
+  kable_styling(font_size = 12, latex_options = "striped") %>% 
+    add_header_above(c("Causal LASSO" = 2))
+```
+
+
+
+
+
